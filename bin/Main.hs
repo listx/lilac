@@ -491,7 +491,7 @@ parseProjectConf input = case parseRawProjectConf input of
       ProjectConf
         { name = rawProjectConf.name,
           homepage = N.parseURI $ T.unpack rawProjectConf.homepage,
-          repo = N.parseURI $ T.unpack rawProjectConf.repo,
+          repo = N.parseURI . T.unpack =<< rawProjectConf.repo,
           version =
             if T.null rawProjectConf.version
               then Nothing

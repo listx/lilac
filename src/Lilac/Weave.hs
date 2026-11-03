@@ -150,6 +150,7 @@ import Lilac.Types
         homepage,
         htmlHead,
         name,
+        repo,
         version
       ),
     Prose (Prose, unProse),
@@ -1998,6 +1999,7 @@ weaveBreadcrumbs :: HtmlWeaver ()
 weaveBreadcrumbs = do
   weaveConf <- ask
   weaveProjectName weaveConf.projectConf --
+  weaveProjectRepo weaveConf.projectConf --
   weaveProjectVersion weaveConf.projectConf --
   let breadcrumbsMiddle =
         (\parts -> take (length parts - 2) (drop 1 parts)) --
@@ -2051,6 +2053,19 @@ weaveBreadcrumbs = do
         let homepageLinkTarget = T.pack $ N.uriToString id uri ""
         a_ [href_ homepageLinkTarget] $ do
           weaveBreadcrumb projectConf.name
+    weaveProjectRepo :: ProjectConf -> HtmlWeaver ()
+    weaveProjectRepo projectConf = case projectConf.repo of
+      Nothing -> pure ()
+      Just uri -> do
+        toHtml @Text " "
+        a_
+          [ href_ . T.pack $ N.uriToString id uri "",
+            class_ "repo-link",
+            title_ "Source repository",
+            makeAttributes "aria-label" "Source repository"
+          ]
+          . toHtmlRaw
+          $ decodeUtf8 @Text @ByteString $(embedFile "src/Lilac/Weave/repo-link.svg")
     weaveProjectVersion :: ProjectConf -> HtmlWeaver ()
     weaveProjectVersion projectConf = case projectConf.version of
       Nothing -> pure ()

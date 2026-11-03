@@ -199,6 +199,7 @@ import Lilac.Types
         homepage,
         htmlHead,
         name,
+        repo,
         version
       ),
     Prose (Prose, unProse),
@@ -695,6 +696,7 @@ import Clay
     sticky,
     stringContent,
     sup,
+    svg,
     table,
     tbody,
     td,
@@ -6406,6 +6408,7 @@ weaveBreadcrumbs :: HtmlWeaver ()
 weaveBreadcrumbs = do
   weaveConf <- ask
   weaveProjectName weaveConf.projectConf -- (ref:f:weaveBreadcrumbs-project-name)
+  weaveProjectRepo weaveConf.projectConf -- (ref:f:weaveBreadcrumbs-project-repo)
   weaveProjectVersion weaveConf.projectConf -- (ref:f:weaveBreadcrumbs-project-version)
   let breadcrumbsMiddle =
         (\parts -> take (length parts - 2) (drop 1 parts)) -- (ref:f:weaveBreadcrumbs-inits-cleanup)
@@ -6459,6 +6462,19 @@ weaveBreadcrumbs = do
         let homepageLinkTarget = T.pack $ N.uriToString id uri ""
         a_ [href_ homepageLinkTarget] $ do
           weaveBreadcrumb projectConf.name
+    weaveProjectRepo :: ProjectConf -> HtmlWeaver ()
+    weaveProjectRepo projectConf = case projectConf.repo of
+      Nothing -> pure ()
+      Just uri -> do
+        toHtml @Text " "
+        a_
+          [ href_ . T.pack $ N.uriToString id uri "",
+            class_ "repo-link",
+            title_ "Source repository",
+            makeAttributes "aria-label" "Source repository"
+          ]
+          . toHtmlRaw
+          $ decodeUtf8 @Text @ByteString $(embedFile "src/Lilac/Weave/repo-link.svg")
     weaveProjectVersion :: ProjectConf -> HtmlWeaver ()
     weaveProjectVersion projectConf = case projectConf.version of
       Nothing -> pure ()
@@ -6473,6 +6489,32 @@ weaveBreadcrumbs = do
       span_ [class_ "breadcrumb-separator"] $ do
         toHtml @Text "/"
       toHtml @Text " "
+#+end_src
+
+If the project has a ~repo~ URL ([[id:df128041-ada8-4d77-a373-111416002dae::(data:ProjectConf-repo)]]), we link to it
+right after the project name [[(f:weaveBreadcrumbs-project-repo)]]. The link is
+just a small "branch" icon, drawn in [[repo-link.svg]]. We use an inline SVG instead
+of a Unicode character, because there is no Unicode character for a Git branch,
+and the closest one (⎇, U+2387) is missing from the Source fonts we use (see
+[[id:d9db3b15-7e70-493a-9cd9-b389d21adfa6][Fonts]]). So the browser would have to borrow it from some other font,
+if there is one. The icon uses ~currentColor~, so it has the same color as the
+other links in the navbar. Because the icon has no text, we describe the link
+with ~title~ (shown on hover) and ~aria-label~ (for screen readers).
+
+#+name: repo-link.svg
+#+header: :tangle src/Lilac/Weave/repo-link.svg
+#+begin_src xml
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 16 16"
+     aria-hidden="true">
+<g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+<circle cx="4" cy="3" r="1.75"></circle>
+<circle cx="4" cy="13" r="1.75"></circle>
+<circle cx="12" cy="3" r="1.75"></circle>
+<path d="M4 4.75v6.5"></path>
+<path d="M12 4.75c0 4-8 3-8 6.5"></path>
+</g>
+</svg>
 #+end_src
 
 The middle breadcrumbs [[(f:weaveBreadcrumbs-middle)]] are perhaps the most
@@ -6510,6 +6552,9 @@ div # ".breadcrumbs" ? do
   <<css:breadcrumbs-truncation>>
 span # ".breadcrumb-separator" ? do
   color colorBreadcrumbSeparator
+a # ".repo-link" ** svg ? do
+  width (em 0.75)
+  height (em 0.75)
 #+end_src
 
 [[css:breadcrumbs-truncation]] truncates the breadcrumbs to the left if there isn't

@@ -42,12 +42,12 @@ objects. So if an archive had an empty ~a.org~, a link to all of ~b.org~ pointed
 to ~/a.html~ instead. Now every object gets its negative ~GCI~, including the
 empty ones, so links to an empty document work too.
 
-** TODO cli: drop the unused repo setting
+** DONE weave: link to the repo in the navbar
 
-~repo~ is a required key in ~Lilac.toml~ ([[id:f5938bb2-e769-4b55-805c-dee0360fccf8::data:RawProjectConf][data:RawProjectConf]]), but nothing reads
-the ~repo~ field of [[id:f5938bb2-e769-4b55-805c-dee0360fccf8::data:ProjectConf][data:ProjectConf]] since the footer stopped using it. Drop
-the setting from both types, from our own ~Lilac.toml~, and from the template
-that ~lilac init~ writes.
+~repo~ was a required key in ~Lilac.toml~ ([[id:f5938bb2-e769-4b55-805c-dee0360fccf8::data:RawProjectConf][data:RawProjectConf]]), but nothing ever
+read the ~repo~ field of [[id:f5938bb2-e769-4b55-805c-dee0360fccf8::data:ProjectConf][data:ProjectConf]]. Now the navbar links to it with a
+small branch icon, between the project name and the version, and the key is
+optional.
 
 ** DONE compile: report each Noweb cycle only once
 

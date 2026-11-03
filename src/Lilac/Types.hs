@@ -873,7 +873,7 @@ type RawProjectConf :: Type
 data RawProjectConf = RawProjectConf
   { name :: Text,
     homepage :: Text,
-    repo :: Text,
+    repo :: Maybe Text,
     version :: Text,
     nonTangledPathspecs :: [Text],
     bibliography :: Maybe [Text],

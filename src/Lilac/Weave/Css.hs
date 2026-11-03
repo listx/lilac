@@ -122,6 +122,7 @@ import Clay
     sticky,
     stringContent,
     sup,
+    svg,
     table,
     tbody,
     td,
@@ -253,6 +254,9 @@ defaultCss = do
       "text-align" -: "left"
     span # ".breadcrumb-separator" ? do
       color colorBreadcrumbSeparator
+    a # ".repo-link" ** svg ? do
+      width (em 0.75)
+      height (em 0.75)
 
   nav # "#tocs" ? do
     "grid-area" -: "tocs"

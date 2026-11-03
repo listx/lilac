@@ -390,7 +390,7 @@ The fields are:
 
   - ~repo~ :: [[(data:ProjectConf-repo)]] URL of the source code repository (the
     assumption being that the Org docs and tangled files are all open source and
-    belonging to the same Git repo).
+    belonging to the same Git repo). If set, the [[id:35d768c0-3e2f-498a-8437-e4137c4500ba][Navigation bar]] links to it.
 
   - ~version~ :: [[(data:ProjectConf-version)]] Human-friendly version information.
     This is used in the [[id:35d768c0-3e2f-498a-8437-e4137c4500ba][Navigation bar]].
@@ -464,7 +464,7 @@ type RawProjectConf :: Type
 data RawProjectConf = RawProjectConf
   { name :: Text,
     homepage :: Text,
-    repo :: Text,
+    repo :: Maybe Text,
     version :: Text,
     nonTangledPathspecs :: [Text],
     bibliography :: Maybe [Text],
@@ -475,7 +475,7 @@ data RawProjectConf = RawProjectConf
   deriving (FromValue, ToValue, ToTable) via GenericTomlTable RawProjectConf
 #+end_src
 
-All keys are expected, except those that use ~Maybe~. So ~bibliography~,
+All keys are expected, except those that use ~Maybe~. So ~repo~, ~bibliography~,
 ~citationStyle~ [[(data:RawProjectConf-citationStyle)]], and ~htmlHead~ are optional.
 
 #+name: f:parseRawProjectConf
@@ -500,7 +500,7 @@ parseProjectConf input = case parseRawProjectConf input of
       ProjectConf
         { name = rawProjectConf.name,
           homepage = N.parseURI $ T.unpack rawProjectConf.homepage,
-          repo = N.parseURI $ T.unpack rawProjectConf.repo,
+          repo = N.parseURI . T.unpack =<< rawProjectConf.repo,
           version =
             if T.null rawProjectConf.version
               then Nothing
