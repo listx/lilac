@@ -4808,13 +4808,14 @@ appear. However, it does expect two conditions:
 During weaving, the footnote definitions are sorted according to the order in
 which they are referenced (via footnote links). See [[id:891f2674-2be9-4e63-b0f8-7ca43f1354fb::f:weaveObject][f:weaveObject]] for details.
 
-The footnotes are not turned into cells; instead they are used to build up the
-~footnoteDefinitions~ map [[(data:OrgParserState-footnoteDefinitions)]] in [[data:OrgParserState]],
-which are then dumped into [[data:OrgDoc]]. This is because there is no point in
-preserving information about the order in which these footnote definitions are
-defined; in other words, it's useless to store footnote definitions as
-individual cells in the order they're defined, if during weave time we are going
-to sort them anyway in a (possibly) different order.
+The footnotes are turned into ~CFootnote~ cells, but they are not like the other
+cells. We parse cells in a linear manner, and every other cell keeps the order
+in which it appears in the Org file. For footnote definitions, the order in
+which they appear has no bearing on anything, because weaving reorders them by
+the order in which they are /referenced/ (see
+[[id:891f2674-2be9-4e63-b0f8-7ca43f1354fb::f:sortFootnoteCells][f:sortFootnoteCells]]). We also use them to build up the ~footnoteDefinitions~
+map [[(data:OrgParserState-footnoteDefinitions)]] in [[data:OrgParserState]], which is what
+[[f:reconcileFootnotes]] checks at the end of parsing.
 
 #+name: f:footnoteDefinitionParser
 #+begin_src haskell
