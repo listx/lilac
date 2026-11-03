@@ -596,7 +596,7 @@ is still too old for us), we can put the following inside the
   foo-bar =
     pkgs.haskell.lib.dontCheck (
       prev.callCabal2nix "foo-bar" (
-        builtins.fetchFromGitHub {
+        fetchFromGitHub {
           owner = "x";
           repo = "y";
           rev = "0000000000000000000000000000000000000000";
