@@ -13269,7 +13269,7 @@ We assign each row its row index with ~zip [1 ..]~, then delegate most of the wo
 to [[f:rowToTuples]] where each row's table cells are given its column index to form
 a completed table cell. These are simply accumulated and returned as a list. The
 order of accumulation (consing) does not matter because this is ultimately fed
-into a ~Map~ type (where the keys are not guaranteed to be ordered).
+into a ~Map~ type (which keeps its keys in sorted order).
 
 #+name: f:rowToTuples
 #+begin_src haskell
