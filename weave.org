@@ -1477,7 +1477,7 @@ div ? do
   ev margin $ rem 0
 #+end_src
 
-The ~<body>~ uses a CSS grid layout to create four distinct areas:
+The ~<body>~ uses a CSS grid layout to create three distinct areas:
 
   1) Navbar :: Contains the filesystem path of the object, as well as a link to
      the homepage of the project
@@ -1488,19 +1488,19 @@ The ~<body>~ uses a CSS grid layout to create four distinct areas:
      contents (TOC)]].
 
   3) Main :: Holds all of the content of the document. The list of cells in the
-     document are rendered one after another in here, top to bottom.
+     document are rendered one after another in here, top to bottom. The page
+     metrics are at the bottom of this area.
 
-  4) Page metrics :: Holds various /widgets/ which aid in navigation. The widgets
-     are:
+The page metrics hold various /widgets/ which aid in navigation. The widgets are:
 
-       1) Tangled files :: List of tangled files in the document.
+  1) Backlinks :: List of backlinks to any named cell in the current document.
 
-       2) Backlinks :: List of backlinks to any named cell in the current document.
+  2) Tangled files :: List of tangled files in the document.
 
-       3) Named cells :: List of named cells in the current document.
+  3) Named cells :: List of named cells in the current document.
 
-     The page metrics also holds a footer [[(css:Layout-footer)]]. See [[f:weaveFooter]]
-     and [[css:Footer]].
+The page metrics also hold a footer [[(css:Layout-footer)]]. See [[f:weaveFooter]] and
+[[css:Footer]].
 
 Widgets are small and require a much smaller heading; therefore they use a ~<p>~
 element instead of something like ~<h6>~. These widget titles are configured at
@@ -6486,9 +6486,9 @@ The page metrics shows additional information about the current document. It
 sits on the bottom of the page (see [[css:Layout]]). It has the following
 parts:
 
-  1) list of tangled files,
+  1) list of backlinks,
 
-  2) list of backlinks,
+  2) list of tangled files,
 
   3) list of named cells, and
 
