@@ -9528,8 +9528,9 @@ The high-level algorithm is as follows:
 
   1) Concatenate the ~BToken~ values together (using the ~Text~ representation). For
      ~BTokenString~ values we use the inner text information as is. For
-     ~BTokenLinkTarget~ we use the target, but also inject a special [[link-marker]]
-     which uses an ASCII ~NUL~ character.
+     Noweb links (~BTokenLinkTarget~ with a ~LinkTargetOid~) we use a special
+     [[link-marker]] instead, which uses an ASCII ~NUL~ character. Other links
+     (line labels) contribute nothing.
 
   2) Split the contents by newline.
 
