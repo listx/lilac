@@ -24,7 +24,6 @@
 
 (defn update-toc-highlights [ancestry visible-headings]
   (let [toc-entries (.querySelectorAll js/document ".toc-entry")
-        toc-container (.querySelector js/document ".toc")
         visible-headings-with-ancestors ;
           (reduce (fn [acc id]
                       (let [ancestors (set (get ancestry (keyword id) []))]
