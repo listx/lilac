@@ -64,7 +64,7 @@ parsing a raw Org file.
 type OrgDoc :: Type
 data OrgDoc = OrgDoc
   { oid :: OID, -- (ref:data:OrgDoc-oid)
-    headingOids :: [OID],
+    headingOids :: [OID], -- (ref:data:OrgDoc-headingOids)
     meta :: Map Text Text, -- (ref:data:OrgDoc-meta)
     cells :: [Cell], -- (ref:data:OrgDoc-cells)
     pseudoEdges :: [PseudoEdge], -- (ref:data:OrgDoc-pseudoEdges)
@@ -122,6 +122,10 @@ form the building block of Org links between them.
 The ~meta~ field [[(data:OrgDoc-meta)]] captures all document metadata, in a simple
 key/value map. One example is ~#+title: ...~ used to specify the human-friendly
 title of the document.
+
+The ~headingOids~ [[(data:OrgDoc-headingOids)]] are the OIDs of all headings in the
+document that have one. [[id:b9c034c1-5499-44e6-855c-6c16e1693cb8::f:mkOidAliases][f:mkOidAliases]] uses them to treat a link to a heading's
+OID as a link to the document's OID.
 
 The ~deriving anyclass (ToJSON)~ [[(deriving-anyclass)]] is needed to create the
 default implementation for JSON conversion automatically for us. It is the
@@ -300,14 +304,14 @@ type OrgParserState :: Type
 data OrgParserState = OrgParserState
   { docOid :: OID, -- (ref:data:OrgParserState-docOid)
     headingOidStack :: [Maybe OID], -- (ref:data:OrgParserState-headingOidStack)
-    headingOids :: [OID],
+    headingOids :: [OID], -- (ref:data:OrgParserState-headingOids)
     headingLevel :: Int, -- (ref:data:OrgParserState-headingLevel)
     headingSectionNumber :: [Int], -- (ref:data:OrgParserState-headingSectionNumber)
     insideHeading :: Bool, -- (ref:data:OrgParserState-insideHeading)
     cellNames :: Set Text, -- (ref:data:OrgParserState-cellNames)
     cellNumber :: LCI, -- (ref:data:OrgParserState-cellNumber)
     pseudoEdges :: [PseudoEdge], -- (ref:data:OrgParserState-pseudoEdges)
-    linkNumber :: Int,
+    linkNumber :: Int, -- (ref:data:OrgParserState-linkNumber)
     tanglePaths :: Set Text, -- (ref:data:OrgParserState-tanglePaths)
     insideBlock :: Bool, -- (ref:data:OrgParserState-insideBlock)
     activeRichBlock :: Text, -- (ref:data:OrgParserState-activeRichBlock)
@@ -432,6 +436,10 @@ of it, we need to know which OID to use. Using ~headingOidStack~, we just pop of
 those ones we don't need any more and refer to the OID of the closest heading up
 the hierarchy (ending at the ~docOid~ if needed as a fallback).
 
+The ~headingOids~ [[(data:OrgParserState-headingOids)]] collect the OID of every
+heading that has one, which becomes the ~headingOids~ of [[data:OrgDoc]]
+[[(data:OrgDoc-headingOids)]].
+
 The ~headingLevel~ [[(data:OrgParserState-headingLevel)]] is the last-seen heading level we
 parsed. See [[t:0004-headings-cannot-skip-level]] for how we use it. This is used
 for determining how many levels to pop off the ~headingOidStack~ when we exit a
@@ -500,6 +508,11 @@ styled strings]], which are one of the main building blocks of [[id:c8616126-215
 
 The ~insideLinkDisplayName~ [[(data:OrgParserState-insideLinkDisplayName)]] and ~insideParagraph~
 [[(data:OrgParserState-insideParagraph)]] booleans are both used in [[f:textParser]].
+
+The ~linkNumber~ [[(data:OrgParserState-linkNumber)]] counts the links in the
+document, so that each link gets its own number (see [[f:linkParser]]). Weaving
+uses this number to give each link a unique HTML ID, which precise backlinks can
+point to (see [[id:a63d2021-2596-4c43-81e3-d08e90077f75::f:weaveLink][f:weaveLink]]).
 
 *** Fields for list items
 

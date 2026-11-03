@@ -397,7 +397,7 @@ data MathFragment = MathFragment
 type OrgDoc :: Type
 data OrgDoc = OrgDoc
   { oid :: OID, --
-    headingOids :: [OID],
+    headingOids :: [OID], --
     meta :: Map Text Text, --
     cells :: [Cell], --
     pseudoEdges :: [PseudoEdge], --
@@ -436,14 +436,14 @@ type OrgParserState :: Type
 data OrgParserState = OrgParserState
   { docOid :: OID, --
     headingOidStack :: [Maybe OID], --
-    headingOids :: [OID],
+    headingOids :: [OID], --
     headingLevel :: Int, --
     headingSectionNumber :: [Int], --
     insideHeading :: Bool, --
     cellNames :: Set Text, --
     cellNumber :: LCI, --
     pseudoEdges :: [PseudoEdge], --
-    linkNumber :: Int,
+    linkNumber :: Int, --
     tanglePaths :: Set Text, --
     insideBlock :: Bool, --
     activeRichBlock :: Text, --
