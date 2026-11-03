@@ -553,7 +553,7 @@ mkPreciseBacklinks pathObjs oidAliases =
               CParagraph prose ->
                 foldl' h acc prose.unProse
               CGlossaryTerm glossaryTerm ->
-                foldl' h acc glossaryTerm.definition.unProse
+                foldl' h acc $ glossaryTerm.term.unProse <> glossaryTerm.definition.unProse
               CTable table ->
                 let gridAcc =
                       foldl'
