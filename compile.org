@@ -1686,7 +1686,7 @@ in [[ti:0100-dag-self-loop]] because when we add the two vertices for this case 
 as an out link when they are parsed in at
 [[id:80637e01-1065-40b0-932c-8ffa2376c863::(f:oidReferenceParser-docOid)]]. So from
 the cycle detection algorithm it's as if we linked from the block (vertex)
-in the test to another block that sits above the heading, which them links
+in the test to another block that sits above the heading, which then links
 to itself forming a 2-block cycle.
 
 Check whether we can detect two independent self-loops.
@@ -2751,7 +2751,7 @@ As for the details around growing the tree itself, it is as follows:
 
   2) Find the ~index~ block and get a list of all paths.
 
-  3) Convert each path in the list with a new (synthetic) ~GPath~.
+  3) Convert each path in the list into a new (synthetic) ~GPath~.
 
   4) Replace each ~GPath~ by its object, by doing a lookup in the map of all
      objects. The map is visible from the State monad so that we can read from
