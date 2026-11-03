@@ -6309,12 +6309,13 @@ The total height of the navbar is \(3\mathrm{rem} + 1\mathrm{px}\) (and not just
 The navbar causes a problem for links that point to elements inside the page,
 because the browser will normally go to the target element by putting it at the
 top of the page, but the navbar will sit on top of it. So we have to adjust it
-so that the navbar never hides something underneath it.
+so that the navbar never hides something underneath it: we add the navbar's
+height and its 1px border, plus a little extra space.
 
 #+name: css:navbar-link-target-adjustment
 #+begin_src css
 html {
-  scroll-padding-top: calc(4rem + 1px + 0.625rem);
+  scroll-padding-top: calc(<<css:navbar-height>> + 1px + 0.625rem);
 }
 #+end_src
 
