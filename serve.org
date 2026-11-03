@@ -257,8 +257,8 @@ liveReloadMiddleware root fsChan logLock verbose baseApp req respond =
 #+end_src
 
 [[f:readStableHtmlFile]] [[(f:liveReloadMiddleware-readStableHtmlFile)]] reads the file
-until it stabilizes (not only has not been modified in 200ms, but has a ~</html>~
-tag inside it). This is needed because we cannot really predict exactly how the
+until it stabilizes (it was not modified while we read it, and it has a ~</html>~
+tag inside it), retrying every 200ms. This is needed because we cannot really predict exactly how the
 file will be saved by Lilac when it is overwritten (when woven), such as whether
 the file is truncated to 0 bytes first and then saved again.
 
