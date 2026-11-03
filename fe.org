@@ -209,9 +209,9 @@ If we are readying Lilac for a production release, it will need to have the
 contents of the single JavaScript file (at ~site/js/lilac.js~) injected into the
 CLI binary. To perform this injection, we have to
 
-  1) Run ~make prod-cljs~ to ensure we have the latest ~js/lilac.js~ file. This
+  1) Run ~make prod-cljs~ to ensure we have the latest ~site/js/lilac.js~ file. This
      also creates a ~lilac.js.injectme~ which is a copy of the
-     just-created (production) ~js/lilac.js~ file, per [[sh:update-injectable]].
+     just-created (production) ~site/js/lilac.js~ file, per [[sh:update-injectable]].
 
   2) Recompile the CLI. This can be done with ~make tangle~ because tangling
      itself relies on the locally compiled version of the ~lilac~ CLI. Because we
@@ -279,7 +279,7 @@ that build.
 Lilac can serve itself with ~lilac serve~ ([[id:b0033603-7251-449b-ba7d-be4a1a118fd0][Serving]]). So you can just open up
 
 #+begin_src bash
-lilac serve .
+lilac serve site
 #+end_src
 
 in another terminal, and then do
