@@ -24,6 +24,54 @@ other sections as needed.
 :ID:       f3c2a043-2d0f-4d6c-a6d5-ce5f58a924c4
 :END:
 
+** TODO weave: escape blocks in languages that Skylighting doesn't know
+
+When Skylighting doesn't know a block's language (such as ~gitignore~ or
+~haskell-cabal~), [[id:e4cc0d4f-b129-4d94-be1c-3c0212527ae7::f:colorizeText][f:colorizeText]] falls back to ~code_ $ toHtmlRaw txt~, which
+writes the block text into the HTML without escaping it. So a ~gitignore~ block
+with ~a<b>c & d~ in it gets a real ~<b>~ tag, and our own woven ~build.org~ has a
+raw ~base >=4.7 && <5~ in it. The fallback should use ~toHtml~ instead.
+
+** TODO compile: fix document links in archives with empty objects
+
+[[id:b9c034c1-5499-44e6-855c-6c16e1693cb8::f:mkArchive][f:mkArchive]] drops objects without any cells before
+[[id:b9c034c1-5499-44e6-855c-6c16e1693cb8::f:docOidsToSymbols][f:docOidsToSymbols]] gives each document its negative ~GCI~. But
+[[id:b9c034c1-5499-44e6-855c-6c16e1693cb8::f:gciToObjPath][f:gciToObjPath]] and [[id:e4cc0d4f-b129-4d94-be1c-3c0212527ae7::f:weaveLinkTargetLinkOid][f:weaveLinkTargetLinkOid]] turn a negative ~GCI~ back into
+a path by indexing into ~sort $ keys archive.objects~, which still has the empty
+objects. So if an archive has an empty ~a.org~, a link to all of ~b.org~ points
+to ~/a.html~ instead.
+
+** TODO cli: drop the unused repo setting
+
+~repo~ is a required key in ~Lilac.toml~ ([[id:f5938bb2-e769-4b55-805c-dee0360fccf8::data:RawProjectConf][data:RawProjectConf]]), but nothing reads
+the ~repo~ field of [[id:f5938bb2-e769-4b55-805c-dee0360fccf8::data:ProjectConf][data:ProjectConf]] since the footer stopped using it. Drop
+the setting from both types, from our own ~Lilac.toml~, and from the template
+that ~lilac init~ writes.
+
+** TODO compile: report each Noweb cycle only once
+
+[[id:b9c034c1-5499-44e6-855c-6c16e1693cb8::f:getBlocksFromArchive][f:getBlocksFromArchive]] goes through ~elems archive.symbols~, so it returns a
+block once for every symbol that points to it (its name under the document OID,
+under the parent heading's OID, and every line label in it).
+[[id:b9c034c1-5499-44e6-855c-6c16e1693cb8::f:findCycles][f:findCycles]] then reports the same cycle several times; a block that refers
+to itself and has two line labels is reported 3 times. This is also the real
+reason why [[id:b9c034c1-5499-44e6-855c-6c16e1693cb8::t:0100-dag-self-loop-heading][t:0100-dag-self-loop-heading]] expects two nodes, and the prose
+there (which talks about a "2-block cycle") needs to be fixed too.
+
+** TODO parse: make styled text survive the round trip back to text
+
+The prose for ~toText~ in the ~CiteprocOutput~ instance for ~Prose~ says that there is no
+loss of information going from ~Text~ to ~Prose~ and back. But
+[[id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::f:unparseStyledText][f:unparseStyledText]] does not escape backslashes, nor ~=~ inside verbatim text
+or ~\~~ inside code text, so such text does not survive the round trip.
+
+** TODO compile: only treat index.org as an index
+
+[[id:b9c034c1-5499-44e6-855c-6c16e1693cb8::f:isIndexObjPath][f:isIndexObjPath]] only checks that the path ends in ~index.lobj~, so a file like
+~appendix-index.org~ is treated as an index too, and then
+[[id:b9c034c1-5499-44e6-855c-6c16e1693cb8::f:getChildPaths][f:getChildPaths]] drops the wrong prefix when it removes the last 10
+characters. It should check the file name instead.
+
 ** DONE compile: detect broken links in more cells
 
 [[id:01da95fe-ba23-4481-9833-428423392f5f::f:findExternalOids][f:findExternalOids]] didn't look inside footnote bodies, glossary terms, or figure
