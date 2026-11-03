@@ -2521,7 +2521,7 @@ The rules inside [[f:slashSeparatedWords]] are a "best effort" attempt, not
 something that is always correct. For example, the ~isWordChar~ forbids a number
 of possibly special characters like ~]~ [[(f:slashSeparatedWords-isWordChar)]] because
 that's a cheap way to prevent it from being too greedy (see
-[[ti:0006-link-slashSeparatedWords]] which demonstrates why we'd want to make it
+[[ti:0006-links-slashSeparatedWords]] which demonstrates why we'd want to make it
 less greedy). For the cases where we need more flexibility, you can use escaped
 slashes like in [[ti:0005-styled-strings-escape-marker]].
 
@@ -3683,7 +3683,7 @@ A link's display text can have slashes in it, per [[f:slashSeparatedWords]] (whe
 the word characters are not too greedy that they gobble up the trailing ~]]~
 string that marks the end of the link).
 
-#+name: ti:0006-link-slashSeparatedWords
+#+name: ti:0006-links-slashSeparatedWords
 #+header: :tangle test/Lilac/ParseSpec/0006-links-slashSeparatedWords
 #+begin_src org
 [[f:a][a/b/c]]
