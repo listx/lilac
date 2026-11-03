@@ -424,9 +424,9 @@ The ~docOid~ [[(data:OrgParserState-docOid)]] is what becomes the ~oid~ [[(data:
 unique prefix to identify named cells (any cell with a ~#+name: ...~, such as a
 block) from other Org files.
 
-The ~headingOidStack~ [[(data:OrgParserState-headingOidStack)]] is a stack of OIDs, with the
-first one being the ~docOid~ and later ones being OIDs of headings encountered at
-deeper levels. This is used to keep track of the current OID to use for named
+The ~headingOidStack~ [[(data:OrgParserState-headingOidStack)]] is a stack of OIDs of the
+headings encountered on the way to the current heading (with ~Nothing~ for a
+heading that has no OID), with deeper levels first. This is used to keep track of the current OID to use for named
 cells; if we are at a deeply nested heading with its own OID, but then move out
 of it, we need to know which OID to use. Using ~headingOidStack~, we just pop off
 those ones we don't need any more and refer to the OID of the closest heading up
