@@ -7767,13 +7767,11 @@ this number with [[id:84edd33a-a146-4a46-ac0a-cd1c3d0926d3][Lilac extensions]]. 
 6 asterisks for a heading because HTML heading tags ~<h1>~, ~<h2>~, etc only go up
 to ~<h6>~. This Org document itself only uses 3 sections.
 
-The heading may also have some metadata associated with it. In practice this
-will be keys and values from a ~:PROPERTIES:~ [[https://orgmode.org/manual/Drawers.html][drawer]], although other drawers are
-possible. Drawers are discussed separately [[id:ca12051e-cd17-4d8d-996a-767695441d48][here]].
+The heading may also have some metadata associated with it. These are keys and
+values from a ~:PROPERTIES:~ [[https://orgmode.org/manual/Drawers.html][drawer]], which is the only type of drawer we parse.
+Drawers are discussed separately [[id:ca12051e-cd17-4d8d-996a-767695441d48][here]].
 
-We store drawer information inside the ~meta~ hashmap [[(data:Heading-meta)]], with
-the drawer name acting as a key prefix (this way we can store multiple drawers,
-if there are any, in a single hashmap).
+We store these keys and values inside the ~meta~ hashmap [[(data:Heading-meta)]].
 
 Other than the level, each heading is made up of [[id:c8616126-215d-49be-8874-c2aca7d93a54][Prose]] text.
 
