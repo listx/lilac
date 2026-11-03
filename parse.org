@@ -10940,8 +10940,8 @@ line (because otherwise we cannot measure indentation accurately), by checking
 ~pState.continuationIndent~ is required because there is no easy way to check for
 the just-parsed token (or character) in Megaparsec --- all parsers only see
 what's in front of it. So then it's up to other parsers to set this to some
-value greater than ~1~ (we do this in [[f:listHeadIndentLevelParser]] which is part of
-[[f:listItemStartParser]])
+value greater than ~0~ (we do this in [[f:listHeadIndentLevelParser]] which is part of
+[[f:listItemStartParser]]).
 
 The ~markersToDrop~ [[(f:listItemsEndParser-markersToDrop)]] is always twice the
 number of ~levelsToDrop~ because we always add 2 (~LItemStart~ plus either
