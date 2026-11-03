@@ -3349,7 +3349,7 @@ button # ".toggle-block-meta-other" ? do
   border (px 1) solid colorCodeBorder
 #+end_src
 
-The rest of the block has three parts (these are evident from [[f:weaveBlock]]):
+The rest of the block has four parts (these are evident from [[f:weaveBlock]]):
 
   1) ~.block-meta~ :: The name or tangle path. These attributes are so common
      (and important) that we always display them where possible.
@@ -3362,7 +3362,10 @@ The rest of the block has three parts (these are evident from [[f:weaveBlock]]):
      This also includes the ancestry of the block (links to other blocks that
      use this block as a child block).
 
-  3) ~.block-body~ :: Main body of the block, which contains the actual code
+  3) ~.block-controls-inline~ :: The button for toggling the display of the block
+     body, for blocks that have one.
+
+  4) ~.block-body~ :: Main body of the block, which contains the actual code
      that have been fenced by ~#+begin_...~ and ~#+end_...~.
 
 #+name: css:Block meta
