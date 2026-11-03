@@ -339,7 +339,7 @@ spec = do
       L.genSectionNumber 1 [1] `shouldBe` [2]
       L.genSectionNumber 2 [1, 1] `shouldBe` [2, 1]
       L.genSectionNumber 3 [1, 1, 1] `shouldBe` [2, 1, 1]
-    it "truncates, then increments the (newst) deepest level if we unnest" $ do
+    it "truncates, then increments the (newest) deepest level if we unnest" $ do
       L.genSectionNumber 1 [3, 5] `shouldBe` [6]
       L.genSectionNumber 3 [3, 5, 6, 7] `shouldBe` [6, 6, 7]
     it "grows the section if we nest deeper" $ do

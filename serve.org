@@ -377,12 +377,12 @@ WebSocket:
 Now we get to the script which refreshes the page. We can't just issue a raw
 ~window.location.reload()~ by itself because we want to remember our scroll
 position in the page. Otherwise when the reload happens, unless we were at a
-link anchor, we would be move up to the very top of the page.
+link anchor, we would be moved up to the very top of the page.
 
 We want to first load the scroll positions (that were saved from the previous
 invocation, if any), then save the current scroll positions (to local storage),
 and then finally do a hard refresh. The one other thing we do is avoid
-performing the hard refresh if either the page has been recently scrolled (if
+performing the hard refresh if the page has been recently scrolled (if
 the user is interacting with the page by scrolling).
 
 #+name: js:reload-page
