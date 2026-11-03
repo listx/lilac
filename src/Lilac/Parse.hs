@@ -2829,10 +2829,9 @@ unparseStyledText styledText =
       Smallcaps -> acc
     escapeStyleMarkers = T.foldl' escape T.empty
     escape acc c
-      | mustEscape && c `elem` ("*/_=~" :: String) = acc <> T.pack ['\\', c]
+      | mustEscape c = acc <> T.pack ['\\', c]
       | otherwise = acc <> T.singleton c
-    mustEscape =
-      not (isCode styledText.style || isVerbatim styledText.style)
+    mustEscape c = isStyleMarker styledText.style c || c == '\\' --
 
 unparseLink :: Link -> Text
 unparseLink link = case link.target of

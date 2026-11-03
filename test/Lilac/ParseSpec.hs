@@ -3445,6 +3445,15 @@ spec = do
         ),
         ( "~*/_=code~",
           Prose [ptext "*/_=code" [Code]]
+        ),
+        ( "back\\\\slash",
+          Prose [ptext "back\\slash" []]
+        ),
+        ( "=a\\=b\\\\c=",
+          Prose [ptext "a=b\\c" [Verbatim]]
+        ),
+        ( "~a\\~b\\\\c~",
+          Prose [ptext "a~b\\c" [Code]]
         )
       ]
     checkTextToProseRoundTrip

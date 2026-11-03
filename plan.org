@@ -60,12 +60,13 @@ reason why [[id:b9c034c1-5499-44e6-855c-6c16e1693cb8::t:0100-dag-self-loop-headi
 there talked about a "2-block cycle". Now each block is only looked at once, and
 the test expects one node.
 
-** TODO parse: make styled text survive the round trip back to text
+** DONE parse: make styled text survive the round trip back to text
 
 The prose for ~toText~ in the ~CiteprocOutput~ instance for ~Prose~ says that there is no
 loss of information going from ~Text~ to ~Prose~ and back. But
-[[id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::f:unparseStyledText][f:unparseStyledText]] does not escape backslashes, nor ~=~ inside verbatim text
-or ~\~~ inside code text, so such text does not survive the round trip.
+[[id:442c807f-c9d9-45a7-88bf-d38cbbca09cf::f:unparseStyledText][f:unparseStyledText]] did not escape backslashes, nor ~=~ inside verbatim text
+or ~\~~ inside code text, so such text did not survive the round trip. Now it
+escapes the same characters that the parser accepts after a backslash.
 
 ** TODO compile: only treat index.org as an index
 

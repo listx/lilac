@@ -6866,7 +6866,13 @@ here, if we wanted to round trip back from ~Text~ into [[newtype:Prose]] we woul
 because [[f:proseParser]] does not support parsing these markers.
 
 Converting a [[data:StyledText]] back into a ~Text~ is straightforward. We simply
-surround the text with the appropriate style markers.
+surround the text with the appropriate style markers, and escape the characters
+that the parser would otherwise read as style markers or escapes
+[[(f:unparseStyledText-escape)]]. These are the same characters that
+[[f:escapedSymbolParser]] and [[f:verbatimCodeParser]] accept after a backslash: the
+backslash itself, and whatever [[f:isStyleMarker]] treats as a style marker. So
+inside verbatim and code text, only the closing marker has to be escaped (along
+with backslashes).
 
 #+name: f:unparseStyledText
 #+begin_src haskell
@@ -6890,10 +6896,9 @@ unparseStyledText styledText =
       Smallcaps -> acc
     escapeStyleMarkers = T.foldl' escape T.empty
     escape acc c
-      | mustEscape && c `elem` ("*/_=~" :: String) = acc <> T.pack ['\\', c]
+      | mustEscape c = acc <> T.pack ['\\', c]
       | otherwise = acc <> T.singleton c
-    mustEscape =
-      not (isCode styledText.style || isVerbatim styledText.style)
+    mustEscape c = isStyleMarker styledText.style c || c == '\\' -- (ref:f:unparseStyledText-escape)
 #+end_src
 
 Converting a [[data:Link]] to ~Text~ is straightforward. We try to avoid duplicating
@@ -7304,6 +7309,15 @@ describe "Text to Prose round trip" $ do
       ),
       ( "~*/_=code~",
         Prose [ptext "*/_=code" [Code]]
+      ),
+      ( "back\\\\slash",
+        Prose [ptext "back\\slash" []]
+      ),
+      ( "=a\\=b\\\\c=",
+        Prose [ptext "a=b\\c" [Verbatim]]
+      ),
+      ( "~a\\~b\\\\c~",
+        Prose [ptext "a~b\\c" [Code]]
       )
     ]
   checkTextToProseRoundTrip
