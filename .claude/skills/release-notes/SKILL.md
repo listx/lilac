@@ -13,6 +13,9 @@ This file is tangled from `build.org`, so make changes to it there.
 - Add new entries to the `** WIP` heading at the top of `release-notes.org`,
   under a group such as `Changes:` or `Fixes:`. Create the heading if it doesn't
   exist.
+- Only change what is under the `** WIP` heading. Never edit the notes of a
+  released (tagged) version, even if they have gone out of date, because they
+  describe the project as it was at that release.
 - When you fix a TODO item in `plan.org`, mark it as `DONE` there instead of
   adding an entry here. It moves here when we draft the notes for a release.
 - End the entry with the word `COMMIT`, as a placeholder for the commit that makes

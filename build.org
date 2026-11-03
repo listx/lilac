@@ -2677,7 +2677,8 @@ is usually written in that same commit, which cannot contain its own hash. The
 hash can also change as we rewrite history before pushing. So we use a placeholder
 word instead, and only fill it in once the hash is final. This skill tells coding
 agents about this convention. Claude Code discovers skills in ~.claude/skills~, so
-we tangle it there.
+we tangle it there. The skill also says to leave the notes of released versions
+alone, because they record what was true at the time of each release.
 
 #+name: .claude/skills/release-notes/SKILL.md
 #+header: :tangle .claude/skills/release-notes/SKILL.md
@@ -2697,6 +2698,9 @@ This file is tangled from `build.org`, so make changes to it there.
 - Add new entries to the `** WIP` heading at the top of `release-notes.org`,
   under a group such as `Changes:` or `Fixes:`. Create the heading if it doesn't
   exist.
+- Only change what is under the `** WIP` heading. Never edit the notes of a
+  released (tagged) version, even if they have gone out of date, because they
+  describe the project as it was at that release.
 - When you fix a TODO item in `plan.org`, mark it as `DONE` there instead of
   adding an entry here. It moves here when we draft the notes for a release.
 - End the entry with the word `COMMIT`, as a placeholder for the commit that makes
