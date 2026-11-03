@@ -1860,10 +1860,12 @@ lciAttrs :: LCI -> [Attributes]
 lciAttrs lci = [id_ ("c-" <> T.show lci.unLCI), class_ "cell-idx"]
 #+end_src
 
-Although these cell index based ~id~ attributes are not used, we still encode it
-in [[f:lciAttrs]] because eventually we want to add keyboard-driven navigation, and
-for that we'll need to highlight the "current" cell, identified by its unique
-ID.
+These cell index based ~id~ attributes are still used, because paragraphs have no
+metadata to name them with, so [[f:getLinkAnchor]] uses the same ~c-...~ ID for them
+[[(f:getLinkAnchor-paragraph-lci)]]. Links to a paragraph, such as backlinks from
+other documents, point at this ID. Eventually we also want to add keyboard-driven
+navigation, and for that we'll need to highlight the "current" cell, identified
+by its unique ID.
 
 Both [[f:wrapWith]] and [[f:wrapWithDiv]] wrap some other HTML content with [[f:lciAttrs]]
 assigned to either a ~<span>~ or ~<div>~, respectively.
