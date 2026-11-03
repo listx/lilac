@@ -782,10 +782,10 @@ import Text.Megaparsec.Char.Lexer (hexadecimal)
 :ID:       7147b743-084d-4abc-8561-5417c7fe10b3
 :END:
 
-[[f:genCss]] is the main top-level function which generates the CSS. There are two
-main parts: one is the [[id:33dc521a-2096-4088-9ccc-e55a2119bbfa][Syntax highlighting theme]] [[(f:genCss-kateLilac)]] used in
-[[id:4ae846e7-b95c-4996-99e8-8ce6a7e0fdc1][Blocks]], and the other is the rest of Lilac ([[f:defaultCss]]) which uses the
-[[https://hackage.haskell.org/package/clay][Clay]] CSS preprocessor. These two parts are concatenated together in [[f:genCss]], so
+[[f:genCss]] is the main top-level function which generates the CSS. There are three
+parts: the [[id:33dc521a-2096-4088-9ccc-e55a2119bbfa][Syntax highlighting theme]] [[(f:genCss-kateLilac)]] used in [[id:4ae846e7-b95c-4996-99e8-8ce6a7e0fdc1][Blocks]], the rest of
+Lilac ([[f:defaultCss]]) which uses the [[https://hackage.haskell.org/package/clay][Clay]] CSS preprocessor, and some raw CSS
+([[f:rawCss]]). These parts are concatenated together in [[f:genCss]] in that order, so
 that Lilac's settings take precedence if there are any conflicts with the
 =Skylighting= parts.
 
