@@ -3948,10 +3948,10 @@ getTableCellsFromRow table n =
       any (not . tableCellLacks markingChars) $ getFirstColumnCells table -- (ref:f:getTableCellsFromRow-markingCharsExistence)
 #+end_src
 
-[[f:tableCellLacks]] just checks whether the column does not have any of the given
-marking characters. In [[(f:getTableCellsFromRow-markingCharsExistence)]], we use it
-to detect special marking characters like the slash ~/~ or column group start
-marker ~<~.
+[[f:tableCellLacks]] just checks whether a table cell does not consist of any one of
+the given marking characters. In [[(f:getTableCellsFromRow-markingCharsExistence)]],
+we use it with [[id:3b072b1b-c63e-4fca-ab56-9388d11aa3c0::f:markingChars][f:markingChars]] to detect whether the first column holds any
+marking characters, such as the slash ~/~.
 
 #+name: f:tableCellLacks
 #+begin_src haskell
