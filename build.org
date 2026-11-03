@@ -1239,10 +1239,10 @@ tangling with the latest Lilac version.
 
 [[f:tangle-loop:run_all_checks]] also runs the unit tests at [[(unit-tests)]], as a
 convenience function, but only if the previous call to ~tangle~ succeeds. This
-way, we only try to run the unit tests if Lilac can tangle itself. As for the
-unit tests, the exit code is ignored with ~|| true~ because oftentimes the tests
-break when we're adding new tests (without this, we would break out of the ~while~
-loop, which is not desirable).
+way, we only try to run the unit tests if Lilac can tangle itself. If the unit
+tests fail, we call [[f:tangle-loop:reset_everything]] and return early, without
+breaking out of the ~while~ loop. The linter's exit code is ignored with ~|| true~
+for the same reason (otherwise ~set -e~ would end the loop).
 
 The initial call to ~run_all_checks()~ in the ~watch()~ function (outside of the
 ~while~ loop) at [[(initial-call-tangle)]] is there for convenience, just in case
