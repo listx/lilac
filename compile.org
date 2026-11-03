@@ -2165,8 +2165,8 @@ checkCycles
 
 If three files form a cycle, that should also be detected.
 
-#+name: ti:0100-dag-2-node-loop-3-files-parent
-#+header: :tangle test/Lilac/CompileSpec/0100-dag-2-node-loop-3-files-parent
+#+name: ti:0100-dag-3-node-loop-3-files-parent
+#+header: :tangle test/Lilac/CompileSpec/0100-dag-3-node-loop-3-files-parent
 #+header: :noweb off
 #+begin_src org
 :PROPERTIES:
@@ -2180,8 +2180,8 @@ hello from a
 ,#+end_src
 #+end_src
 
-#+name: ti:0100-dag-2-node-loop-3-files-middleman
-#+header: :tangle test/Lilac/CompileSpec/0100-dag-2-node-loop-3-files-middleman
+#+name: ti:0100-dag-3-node-loop-3-files-middleman
+#+header: :tangle test/Lilac/CompileSpec/0100-dag-3-node-loop-3-files-middleman
 #+header: :noweb off
 #+begin_src org
 :PROPERTIES:
@@ -2194,8 +2194,8 @@ hello from b
 ,#+end_src
 #+end_src
 
-#+name: ti:0100-dag-2-node-loop-3-files-child
-#+header: :tangle test/Lilac/CompileSpec/0100-dag-2-node-loop-3-files-child
+#+name: ti:0100-dag-3-node-loop-3-files-child
+#+header: :tangle test/Lilac/CompileSpec/0100-dag-3-node-loop-3-files-child
 #+header: :noweb off
 #+begin_src org
 :PROPERTIES:
@@ -2208,12 +2208,12 @@ hello from c
 ,#+end_src
 #+end_src
 
-#+name: t:0100-dag-2-node-loop-3-files
+#+name: t:0100-dag-3-node-loop-3-files
 #+begin_src haskell
 checkCycles
-  [ "0100-dag-2-node-loop-3-files-parent",
-    "0100-dag-2-node-loop-3-files-middleman",
-    "0100-dag-2-node-loop-3-files-child"
+  [ "0100-dag-3-node-loop-3-files-parent",
+    "0100-dag-3-node-loop-3-files-middleman",
+    "0100-dag-3-node-loop-3-files-child"
   ]
   [ Node
       { rootLabel =
@@ -3550,7 +3550,7 @@ Below are all of the individual test cases.
 <<t:0100-dag-complex-loops>>
 <<t:0100-dag-2-node-loop-2-files>>
 <<t:0100-dag-2-node-loop-2-files-heading>>
-<<t:0100-dag-2-node-loop-3-files>>
+<<t:0100-dag-3-node-loop-3-files>>
 <<t:0105-gtoc-no-root-index>>
 <<t:0105-gtoc-root-index-without-index-block>>
 <<t:0105-gtoc-basic>>

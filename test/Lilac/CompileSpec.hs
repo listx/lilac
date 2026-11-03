@@ -378,9 +378,9 @@ spec = do
     ]
 
   checkCycles
-    [ "0100-dag-2-node-loop-3-files-parent",
-      "0100-dag-2-node-loop-3-files-middleman",
-      "0100-dag-2-node-loop-3-files-child"
+    [ "0100-dag-3-node-loop-3-files-parent",
+      "0100-dag-3-node-loop-3-files-middleman",
+      "0100-dag-3-node-loop-3-files-child"
     ]
     [ Node
         { rootLabel =
