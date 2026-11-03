@@ -1352,7 +1352,7 @@ Because [[id:21ccfaf6-cd49-46b6-9075-4952f3eea207::f:lilacWeave][f:lilacWeave]] 
 written to ~site/css/default.css~. Otherwise, the [[id:7e6758c8-a642-4cfa-9e03-498163d6ce68::make:Build prod JS][make:Build prod JS]] rule will
 fail because the [[id:90d66ea1-a994-4fdb-b969-c28cec04352d::cfg:figwheel-main.edn][cfg:figwheel-main.edn]] expects the ~css~ directory to exist.
 
-The ~$(vendored)~ variable is defined at [[(Makefile:vendor-assets-vendored)]].
+The ~$(vendored)~ variable is defined at [[(make:vendor-assets-vendored)]].
 
 We make Git ignore the ~weave~ file because it's a [[id:b649d761-1103-47be-86e4-56a7362a5ecc][sentinel file]].
 
@@ -1567,7 +1567,7 @@ install-release: tangle build-release
 
 #+name: make:Publish
 #+begin_src makefile
-<<Makefile:vendor-assets>>
+<<make:Vendor assets>>
 
 PAGES_BRANCH := gh-pages
 PAGES_DOMAIN := lilac.funloop.org
@@ -1591,9 +1591,9 @@ publish: $(archive_file) weave $(vendored)
 
 The published site is made up of the woven contents plus the vendored assets.
 
-#+name: Makefile:vendor-assets
+#+name: make:Vendor assets
 #+begin_src makefile
-# (ref:Makefile:vendor-assets-vendored)
+# (ref:make:vendor-assets-vendored)
 vendored := \
 	vendor/source-fonts \
 	vendor/mathjax \
@@ -1611,7 +1611,7 @@ in scripts from CDNs, and it keeps us self-contained. Lilac has a ~lilac init
 --only-local-imports~ command which gives us some scripts to download MathJax and
 also Source fonts. The vendoring scripts come from [[id:d166e21d-8ffb-490e-883d-25acf2e45faf][Vendored assets]] (they are
 tangled from that section to be embedded into the ~lilac init~ command, but also
-reused in [[Makefile:vendor-assets]]).
+reused in [[make:Vendor assets]]).
 
 Finally we need to actually use these vendored assets by referring to them in
 every woven HTML file. That's what we do in [[custom-html-head]].
