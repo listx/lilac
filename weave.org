@@ -545,14 +545,11 @@ Note that the inner monad is the ~ReaderT~. This way we don't have to call ~lift
 every single time we want to use a Lucid combinator like ~head_~ or ~body_~.
 
 Now we just need a starting point for using ~HtmlWeaver~. For weaving, the final
-thing we want to generate is a ~Text~ value. Lucid gives us ~renderTextT~, which can
-run inside a monad. This means we can use that to generate ~Text~ from
-[[type:HtmlWeaver]]; this is what [[f:renderAsText]] does.
+thing we want to generate is a ~Text~ value; this is what [[f:renderAsText]] does.
 
 [[f:renderAsText]] takes a ~WeaveConf~ and an ~HtmlWeaver a~ action, and converts it to
-a ~Text~ type. It's there because we cannot use any of the default rendering
-functions that Lucid gives us (because they operate on Lucid's ~HtmlT~, not the
-~HtmlWeaver~ we use).
+a ~Text~ type. It's there because we cannot directly use Lucid's ~renderText~ (it
+operates on ~HtmlT Identity~, not the ~HtmlWeaver~ we use).
 
 #+name: f:renderAsText
 #+begin_src haskell
