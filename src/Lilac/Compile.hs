@@ -655,7 +655,8 @@ buildGraph = G.graphFromEdges . foldl' f []
       _ -> Nothing
 
 getBlocksFromArchive :: Archive -> [(OID, Block)]
-getBlocksFromArchive archive = foldl' f [] $ elems archive.symbols
+getBlocksFromArchive archive =
+  foldl' f [] . hashNub $ elems archive.symbols --
   where
     f :: [(OID, Block)] -> GCI -> [(OID, Block)]
     f acc gci

@@ -1615,7 +1615,8 @@ keep track of which document that block came from.
 #+name: f:getBlocksFromArchive
 #+begin_src haskell
 getBlocksFromArchive :: Archive -> [(OID, Block)]
-getBlocksFromArchive archive = foldl' f [] $ elems archive.symbols
+getBlocksFromArchive archive =
+  foldl' f [] . hashNub $ elems archive.symbols -- (ref:f:getBlocksFromArchive-hashNub)
   where
     f :: [(OID, Block)] -> GCI -> [(OID, Block)]
     f acc gci
@@ -1625,6 +1626,14 @@ getBlocksFromArchive archive = foldl' f [] $ elems archive.symbols
             _ -> acc
       | otherwise = acc
 #+end_src
+
+A block can have several symbols that point to it: its name under the document
+OID, its name under the OID of its parent heading, and each of its line labels.
+So we remove duplicate ~GCI~ values first [[(f:getBlocksFromArchive-hashNub)]].
+Otherwise we would get the same block more than once, and [[f:buildGraph]] would
+add the same vertices for each copy. Then [[f:findCycles]] would report the same
+cycle more than once (see [[t:0100-dag-self-loop-heading]] and
+[[t:0100-dag-self-loop-line-labels]]).
 
 *** Tests
 
@@ -1728,26 +1737,52 @@ checkCycles
               name = "f:a"
             },
         subForest = []
-      },
-    Node
+      }
+  ]
+#+end_src
+
+[[f:buildGraph]] adds two vertices for ~f:a~ here, one for the heading OID and one
+for the document OID. But we still get only one cycle, because both vertices
+link out to the document OID (implicitly), as parsed at
+[[id:80637e01-1065-40b0-932c-8ffa2376c863::(f:oidReferenceParser-docOid)]]. So only
+the vertex for the document OID links to itself. The vertex for the heading OID
+just points to it, and is not part of the cycle.
+
+Line labels give a block even more symbols. Besides the symbol for the block's
+~#+name~ (~f:a~ in the test below), each line label in the block gets a symbol
+of its own [[(f:mkSymbols-getLineLabels)]], and all of these symbols point to the
+same ~GCI~. These must not make us report the same cycle more than once either.
+
+#+name: ti:0100-dag-self-loop-line-labels
+#+header: :tangle test/Lilac/CompileSpec/0100-dag-self-loop-line-labels
+#+header: :noweb off
+#+header: :line-label off
+#+begin_src org
+:PROPERTIES:
+:ID:       00000000-0000-0000-0000-00000000e020
+:END:
+
+,#+name: f:a
+,#+begin_src haskell
+f = 1 + 1 -- (ref:x)
+<<f:a>> -- (ref:y)
+,#+end_src
+#+end_src
+
+#+name: t:0100-dag-self-loop-line-labels
+#+begin_src haskell
+checkCycles
+  ["0100-dag-self-loop-line-labels"]
+  [ Node
       { rootLabel =
           LinkOid
-            { oid = fromWords 0x0000000000000000 0x000000000000e001,
+            { oid = fromWords 0x0000000000000000 0x000000000000e020,
               name = "f:a"
             },
         subForest = []
       }
   ]
 #+end_src
-
-We get two nodes (vertices) in [[t:0100-dag-self-loop-heading]] instead of just one
-in [[ti:0100-dag-self-loop]] because when we add the two vertices for this case in
-[[f:buildGraph]], both vertices will link out to the same document OID (implicitly)
-as an out link when they are parsed in at
-[[id:80637e01-1065-40b0-932c-8ffa2376c863::(f:oidReferenceParser-docOid)]]. So from
-the cycle detection algorithm it's as if we linked from the block (vertex)
-in the test to another block that sits above the heading, which then links
-to itself forming a 2-block cycle.
 
 Check whether we can detect two independent self-loops.
 
@@ -3680,6 +3715,7 @@ Below are all of the individual test cases.
 <<t:0100-dag-no-loops>>
 <<t:0100-dag-self-loop>>
 <<t:0100-dag-self-loop-heading>>
+<<t:0100-dag-self-loop-line-labels>>
 <<t:0100-dag-self-loops>>
 <<t:0100-dag-2-node-loop>>
 <<t:0100-dag-2-node-loop-heading>>

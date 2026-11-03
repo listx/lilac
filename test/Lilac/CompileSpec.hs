@@ -194,11 +194,15 @@ spec = do
                 name = "f:a"
               },
           subForest = []
-        },
-      Node
+        }
+    ]
+
+  checkCycles
+    ["0100-dag-self-loop-line-labels"]
+    [ Node
         { rootLabel =
             LinkOid
-              { oid = fromWords 0x0000000000000000 0x000000000000e001,
+              { oid = fromWords 0x0000000000000000 0x000000000000e020,
                 name = "f:a"
               },
           subForest = []

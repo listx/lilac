@@ -49,15 +49,16 @@ the ~repo~ field of [[id:f5938bb2-e769-4b55-805c-dee0360fccf8::data:ProjectConf]
 the setting from both types, from our own ~Lilac.toml~, and from the template
 that ~lilac init~ writes.
 
-** TODO compile: report each Noweb cycle only once
+** DONE compile: report each Noweb cycle only once
 
-[[id:b9c034c1-5499-44e6-855c-6c16e1693cb8::f:getBlocksFromArchive][f:getBlocksFromArchive]] goes through ~elems archive.symbols~, so it returns a
+[[id:b9c034c1-5499-44e6-855c-6c16e1693cb8::f:getBlocksFromArchive][f:getBlocksFromArchive]] went through ~elems archive.symbols~, so it returned a
 block once for every symbol that points to it (its name under the document OID,
 under the parent heading's OID, and every line label in it).
-[[id:b9c034c1-5499-44e6-855c-6c16e1693cb8::f:findCycles][f:findCycles]] then reports the same cycle several times; a block that refers
-to itself and has two line labels is reported 3 times. This is also the real
-reason why [[id:b9c034c1-5499-44e6-855c-6c16e1693cb8::t:0100-dag-self-loop-heading][t:0100-dag-self-loop-heading]] expects two nodes, and the prose
-there (which talks about a "2-block cycle") needs to be fixed too.
+[[id:b9c034c1-5499-44e6-855c-6c16e1693cb8::f:findCycles][f:findCycles]] then reported the same cycle several times; a block that refers
+to itself and has two line labels was reported 3 times. This was also the real
+reason why [[id:b9c034c1-5499-44e6-855c-6c16e1693cb8::t:0100-dag-self-loop-heading][t:0100-dag-self-loop-heading]] expected two nodes, and the prose
+there talked about a "2-block cycle". Now each block is only looked at once, and
+the test expects one node.
 
 ** TODO parse: make styled text survive the round trip back to text
 
