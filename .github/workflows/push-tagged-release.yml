@@ -1,0 +1,48 @@
+name: Push tagged release to Cachix
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to build (for example v0.3.0.0)
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Build and push tagged release
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ env.TAG }}
+          submodules: true
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+
+      - name: Set up Cachix
+        uses: cachix/cachix-action@v17
+        with:
+          name: funloop
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          skipPush: true # We push explicitly via `make push-release`.
+
+      - name: Build and push to Cachix
+        run: |
+          tag_object="$(git ls-remote origin "refs/tags/${TAG}" | cut -f1)" # (ref:GHA-tag-object)
+          if [[ -z "${tag_object}" ]]; then
+            echo "Tag ${TAG} not found on the remote."
+            exit 1
+          fi
+          nix-shell --run "make push-release LILAC_GIT_REV=${tag_object}"
+
+      - name: Print lilac version
+        run: result/bin/lilac --version

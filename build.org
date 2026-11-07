@@ -2275,6 +2275,82 @@ jobs:
           nix-shell --run "make publish"
 #+end_src
 
+** Cachix builds for release tags
+
+The builds above name the commit in their version string, because
+[[make:Build lilac with Nix]] uses ~git rev-parse HEAD~. But a consumer can also fetch a
+release tag with ~builtins.fetchGit~ and pass ~rev = lilacSrc.rev;~ to
+[[nix/release.nix]] (see [[nix:version]]). Our release tags are annotated
+(see [[id:1fe40405-2fc3-4cf8-8352-974e5cfee33b::stamp-new-version.sh][stamp-new-version.sh]]), and for an annotated tag ~fetchGit~ gives the hash of
+the tag object, not of the commit that the tag points to. So the consumer's
+version string, and with it the whole derivation, differs from the one we pushed
+from the branch, and Nix has to build Lilac from source instead of downloading it
+from Cachix.
+
+To fix this, we build each release tag again, this time with the tag object's
+hash. We get the hash with ~git ls-remote~ [[(GHA-tag-object)]], which (just like
+~fetchGit~) reports what the tag ref itself points to: the tag object for an
+annotated tag, or the commit for a lightweight one. We then pass it to
+[[make:Push binary to Cachix]] as ~LILAC_GIT_REV~ on the command line, which overrides
+the value from ~git rev-parse HEAD~.
+
+This runs whenever we push a tag. It can also be run by hand for a tag that was
+pushed before this workflow existed.
+
+#+name: GHA-push-tagged-release
+#+header: :tangle .github/workflows/push-tagged-release.yml
+#+header: :line-label tangle
+#+begin_src yaml
+name: Push tagged release to Cachix
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to build (for example v0.3.0.0)
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Build and push tagged release
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ env.TAG }}
+          submodules: true
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+
+      - name: Set up Cachix
+        uses: cachix/cachix-action@v17
+        with:
+          name: funloop
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          skipPush: true # We push explicitly via `make push-release`.
+
+      - name: Build and push to Cachix
+        run: |
+          tag_object="$(git ls-remote origin "refs/tags/${TAG}" | cut -f1)" # (ref:GHA-tag-object)
+          if [[ -z "${tag_object}" ]]; then
+            echo "Tag ${TAG} not found on the remote."
+            exit 1
+          fi
+          nix-shell --run "make push-release LILAC_GIT_REV=${tag_object}"
+
+      - name: Print lilac version
+        run: result/bin/lilac --version
+#+end_src
+
 * Cabal configuration
 :PROPERTIES:
 :ID:       6fe8f5c2-bf13-4ebe-9fdb-6bda59a919a8
