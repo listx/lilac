@@ -1,0 +1,13 @@
+A: circle "A"
+B: circle "B" at A + (1.5, 0.5)
+C: circle "C" at B + (1, 0)
+D: circle "D" at B + (0.5, -0.9)
+
+Self: spline -> from A.n go up 0.3 then right 0.4 then 0.2 heading 160 to A.ne
+text "Self-loop" ljust at Self.w + (0.4, 0)
+
+arrow from B.e to C.w
+Mid: arrow <- from D.ne to C.s
+arrow from D.nw to B.s
+
+text "Strongly-connected" "component" at Mid + (0.7, -0.1)
