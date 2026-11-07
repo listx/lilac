@@ -5,6 +5,24 @@
 
 * Versions
 
+** WIP
+
+Fixes:
+
+  - Download release builds from Cachix instead of compiling them. Our release
+    tags are annotated, so ~builtins.fetchGit~ gives the hash of the tag object
+    as ~rev~, not the hash of the commit. But CI only cached builds named after
+    the commit, so a consumer that fetched a release tag never found its build in
+    the cache. Now CI also caches each release tag under the tag object's hash.
+    The Nix setup in the [[id:be668181-6a9f-4dac-8e5a-8dc57fd5a651][Basic initial setup]] passed ~lilacGitVersion~, which
+    no cached build uses, so if you copied it, change it to pass ~{ rev =
+    lilacSrc.rev; }~ instead.
+
+      - 119a45f3 (build: push a Cachix build for each release tag, 2026-11-07)
+
+      - 73ef5884 (user manual: pass rev to release.nix in the Nix setup,
+        2026-11-07)
+
 ** v0.3.0.0
 
 Improvements:
