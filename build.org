@@ -1507,8 +1507,11 @@ lilacPkg = import "${lilacSrc}/nix/release.nix" { rev = lilacSrc.rev; };
 #+end_src
 
 They could even use ~rev = "<sha>";~ instead of [[(ref)]], if they wanted to build at a
-particular commit SHA. The User Manual ([[id:be668181-6a9f-4dac-8e5a-8dc57fd5a651][Basic initial setup]]) instead passes ~lilacGitVersion~ with the
-tag name, which gives a version string without the commit hash.
+particular commit SHA. The User Manual ([[id:be668181-6a9f-4dac-8e5a-8dc57fd5a651][Basic initial setup]]) recommends the
+same ~rev = lilacSrc.rev;~, because that is what our cached builds use. For a
+release tag, ~lilacSrc.rev~ is the hash of the tag object rather than of the
+commit, which is why CI builds each tag separately (see
+[[id:0cf535d6-f852-4b97-8ef8-9d566ad32e51][GitHub CI builds]]).
 
 Back to version generation. In [[make:Build lilac with Nix]], ~LILAC_GIT_REV~ is the
 full commit hash, with ~-dirty~ appended if tracked files have changes.

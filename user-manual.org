@@ -292,8 +292,8 @@ Lilac from the sources). After installing Cachix, run
 cachix use funloop
 #+end_src
 
-to get access to the cached builds (all pushes to the ~main~ and ~next~ branches
-are cached).
+to get access to the cached builds (every release tag, and every push to the
+~main~ and ~next~ branches, is cached).
 
 And then from your project's Nix configuration, you can bring Lilac into your
 project's scope with:
@@ -307,18 +307,23 @@ lilacSrc = builtins.fetchGit {
   submodules = true;
 };
 
-lilacPkg = import "${lilacSrc}/nix/release.nix" {
-  lilacGitVersion = "<<lilac-version>>";
-};
+lilacPkg = import "${lilacSrc}/nix/release.nix" { rev = lilacSrc.rev; };
 #+end_src
 
 where ~<<lilac-version>>~ is the version string ~vX.X.X.X~ you want to use. The
 current version is defined at [[id:ee7a98ad-6b13-4489-9a04-58a7c80899e7::Lilac version][Lilac version]], so you should use that one (with a
 leading ~v~ added, to match the Git tag).
 
-If you would rather build Lilac at a particular commit, pass ~rev =
-lilacSrc.rev;~ instead of ~lilacGitVersion~, so that the version string names the
-commit (see [[id:d8a6d891-5e3c-44cc-ac43-38d8090ebfbd][Build ~lilac~]]).
+Pass ~rev = lilacSrc.rev;~ exactly as above, because the version string is part of
+the build, and so is part of what Nix looks up in the cache. The cached build of
+each release tag uses the same ~rev~ that ~fetchGit~ gives you for that tag (see
+[[id:0cf535d6-f852-4b97-8ef8-9d566ad32e51][GitHub CI builds]]). If you pass ~lilacGitVersion~ instead, or pass ~release.nix~ some
+other ~rev~, then Nix won't find your build in the cache and will compile Lilac
+from source.
+
+If you would rather build Lilac at a particular commit, replace ~ref~ with ~rev =
+"<sha>";~ in the ~fetchGit~ call. Builds of commits that were at the tip of a push
+to ~main~ or ~next~ are cached too (see [[id:d8a6d891-5e3c-44cc-ac43-38d8090ebfbd][Build ~lilac~]]).
 
 *** Summary
 
